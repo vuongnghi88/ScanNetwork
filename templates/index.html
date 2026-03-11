@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% block title %}Trang chủ{% endblock %}
+{% block page_title %}<i class="bi bi-grid-1x2 me-2 text-accent"></i>Trang chủ{% endblock %}
+
+{% block content %}
+<!-- Stat cards -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-xl-3">
+        <div class="stat-card">
+            <span class="stat-icon">🖥️</span>
+            <div class="stat-value" id="stat-hosts">—</div>
+            <div class="stat-label">Số thiết bị tìm thấy</div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="stat-card">
+            <span class="stat-icon">🚪</span>
+            <div class="stat-value" id="stat-ports">—</div>
+            <div class="stat-label">Cổng đang mở (Open)</div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="stat-card danger">
+            <span class="stat-icon">🚨</span>
+            <div class="stat-value" id="stat-critical">—</div>
+            <div class="stat-label">Cảnh báo nghiêm trọng</div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="stat-card success">
+            <span class="stat-icon">📋</span>
+            <div class="stat-value" id="stat-scans">—</div>
+            <div class="stat-label">Tổng lượt quét</div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <!-- Recent Scans -->
+    <div class="col-lg-7">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-clock-history"></i> Lượt quét gần đây
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Mục tiêu</th>
+                                <th>Loại quét</th>
+                                <th>Trạng thái</th>
+                                <th>Thời gian</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="recent-scans-tbody">
+                            <tr><td colspan="5" class="text-center text-muted py-4">Đang tải…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Alerts -->
+    <div class="col-lg-5">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-exclamation-triangle"></i> Cảnh báo gần đây</span>
+                <a href="/alerts" class="btn btn-sm btn-outline-secondary py-0">Xem tất cả</a>
+            </div>
+            <div class="card-body" id="recent-alerts-body" style="max-height:350px;overflow-y:auto;">
+                <div class="text-center text-muted py-4">Loading…</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Device Distribution -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header"><i class="bi bi-pie-chart"></i> Phân loại thiết bị</div>
+            <div class="card-body" id="device-dist-body">
+                <div class="text-center text-muted py-3">Đang tải…</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadDashboard() {
+    const [statsRes, scansRes, alertsRes] = await Promise.all([
+        fetch('/api/stats').then(r=>r.json()).catch(()=>{}),
+        fetch('/api/scans').then(r=>r.json()).catch(()=>[]),
+        fetch('/api/alerts').then(r=>r.json()).catch(()=>[]),
+    ]);
+
+    // Stats
+    if (statsRes) {
+        document.getElementById('stat-hosts').textContent   = statsRes.total_hosts ?? '0';
+        document.getElementById('stat-ports').textContent   = statsRes.total_open_ports ?? '0';
+        document.getElementById('stat-critical').textContent= statsRes.critical_alerts ?? '0';
+        document.getElementById('stat-scans').textContent   = statsRes.total_scans ?? '0';
+
+        // Device distribution
+        const distBody = document.getElementById('device-dist-body');
+        const dist = statsRes.device_distribution || [];
+        if (dist.length === 0) {
+            distBody.innerHTML = '<div class="text-center text-muted py-2">Chưa tìm thấy thiết bị nào. Hãy thực hiện quét trước.</div>';
+        } else {
+            const max = Math.max(...dist.map(d => d.count));
+            distBody.innerHTML = dist.map(d => `
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <div style="width:170px;font-size:.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${d.device_type}">${d.device_type}</div>
+                    <div class="flex-grow-1">
+                        <div class="progress" style="height:6px">
+                            <div class="progress-bar" style="width:${Math.round(d.count/max*100)}%"></div>
+                        </div>
+                    </div>
+                    <span class="text-mono text-muted" style="width:28px;text-align:right;font-size:.8rem">${d.count}</span>
+                </div>`).join('');
+        }
+    }
+
+    // Recent scans
+    const tbody = document.getElementById('recent-scans-tbody');
+    if (!scansRes || scansRes.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">Chưa có lượt quét nào. <a href="/scan">Thực hiện lượt quét đầu tiên →</a></td></tr>';
+    } else {
+        tbody.innerHTML = scansRes.slice(0, 8).map(s => `
+            <tr>
+                <td class="ip-addr">${s.target}</td>
+                <td><span class="badge bg-secondary">${s.scan_type}</span></td>
+                <td>${statusBadge(s.status)}</td>
+                <td class="text-muted" style="font-size:.75rem">${fmt_time(s.start_time)}</td>
+                <td><a href="/scan?view=${s.id}" class="btn btn-sm btn-outline-secondary py-0 px-2">Xem</a></td>
+            </tr>`).join('');
+    }
+
+    // Recent alerts
+    const alertBody = document.getElementById('recent-alerts-body');
+    const unread = (alertsRes || []).filter(a => !a.is_read).slice(0, 6);
+    if (unread.length === 0) {
+        alertBody.innerHTML = '<div class="no-data-placeholder"><i class="bi bi-check-circle"></i>Không có cảnh báo</div>';
+    } else {
+        alertBody.innerHTML = unread.map(a => `
+            <div class="alert-item unread severity-${a.severity}">
+                <span class="alert-item-icon">${severityIcon(a.severity)}</span>
+                <div class="alert-item-body">
+                    <div class="alert-item-title">${a.title}</div>
+                    <div class="alert-item-msg">${a.message || ''}</div>
+                    <div class="alert-item-time">${fmt_time(a.created_at)}</div>
+                </div>
+            </div>`).join('');
+    }
+}
+
+function statusBadge(s) {
+    const map = {pending:'Đang chờ',running:'Đang quét',done:'Hoàn tất',error:'Lỗi'};
+    const colors = {pending:'secondary',running:'primary',done:'success',error:'danger'};
+    return `<span class="badge bg-${colors[s]||'secondary'}">${map[s]||s}</span>`;
+}
+function severityIcon(s) { return {critical:'🚨',high:'⚠️',medium:'ℹ️',low:'✅'}[s]||'❓'; }
+function fmt_time(t) {
+    if (!t) return '—';
+    return new Date(t).toLocaleString('vi-VN', {dateStyle:'short',timeStyle:'short'});
+}
+
+loadDashboard();
+setInterval(loadDashboard, 30000);
+</script>
+{% endblock %}

@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block title %}Thiết bị giám sát{% endblock %}
+{% block page_title %}<i class="bi bi-shield-check me-2 text-primary"></i>Danh sách Thiết bị giám sát{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+    <!-- Form to add device -->
+    <div class="col-lg-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-transparent py-3">
+                <h6 class="mb-0"><i class="bi bi-plus-circle me-1"></i>Thêm thiết bị mới</h6>
+            </div>
+            <div class="card-body">
+                <form id="add-device-form">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Địa chỉ IP <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="dev-ip" placeholder="VD: 192.168.1.10" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Tên thiết bị</label>
+                        <input type="text" class="form-control" id="dev-name" placeholder="VD: Server Kế toán">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Hãng sản xuất</label>
+                        <input type="text" class="form-control" id="dev-vendor" placeholder="VD: Cisco, Dell...">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Mã / Model</label>
+                        <input type="text" class="form-control" id="dev-model" placeholder="VD: Catalyst 2960">
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100 mt-2">
+                        <i class="bi bi-save me-1"></i>Lưu thiết bị
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Device List Table -->
+    <div class="col-lg-8">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-transparent py-3 d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="bi bi-list-ul me-1"></i>Danh sách đã lưu</h6>
+                <div class="badge bg-primary px-2 py-1" id="device-count">0 thiết bị</div>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="bg-light">
+                            <tr>
+                                <th class="ps-3" style="width: 150px">Địa chỉ IP</th>
+                                <th>Tên / Hãng</th>
+                                <th>Mã hàng</th>
+                                <th class="text-end pe-3" style="width: 100px">Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody id="monitored-tbody">
+                            <tr>
+                                <td colspan="4" class="text-center py-5 text-muted">
+                                    <div class="spinner-border spinner-border-sm me-2"></div> Đang tải dữ liệu...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let devices = [];
+
+async function loadDevices() {
+    try {
+        devices = await fetch('/api/monitored').then(r => r.json());
+        renderDevices();
+    } catch (err) {
+        showToast('Lỗi khi tải danh sách thiết bị', 'danger');
+    }
+}
+
+function renderDevices() {
+    const tbody = document.getElementById('monitored-tbody');
+    document.getElementById('device-count').textContent = `${devices.length} thiết bị`;
+    
+    if (devices.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" class="text-center py-5 text-muted">Chưa có thiết bị nào trong danh sách giám sát.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = devices.map(d => `
+        <tr>
+            <td class="ps-3 fw-bold ip-addr">${d.ip}</td>
+            <td>
+                <div class="fw-semibold">${d.name || 'N/A'}</div>
+                <div class="text-muted small">${d.vendor || 'Unknown Vendor'}</div>
+            </td>
+            <td>${d.model || '—'}</td>
+            <td class="text-end pe-3">
+                <button class="btn btn-link btn-sm text-danger" onclick="deleteDevice(${d.id}, '${d.ip}')">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+document.getElementById('add-device-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = {
+        ip: document.getElementById('dev-ip').value,
+        name: document.getElementById('dev-name').value,
+        vendor: document.getElementById('dev-vendor').value,
+        model: document.getElementById('dev-model').value
+    };
+
+    try {
+        const res = await fetch('/api/monitored', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+        const resData = await res.json();
+        
+        if (res.ok) {
+            showToast('Đã thêm thiết bị thành công', 'success');
+            document.getElementById('add-device-form').reset();
+            loadDevices();
+        } else {
+            showToast(resData.error || 'Lỗi khi thêm thiết bị', 'danger');
+        }
+    } catch (err) {
+        showToast('Lỗi mạng', 'danger');
+    }
+});
+
+async function deleteDevice(id, ip) {
+    const ok = await confirmModal('Xóa thiết bị', `Bạn có chắc chắn muốn xóa ${ip} khỏi danh sách giám sát?`);
+    if (!ok) return;
+
+    try {
+        const res = await fetch(`/api/monitored/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+            showToast('Đã xóa thiết bị', 'info');
+            loadDevices();
+        } else {
+            const data = await res.json();
+            showToast(data.error || 'Lỗi khi xóa', 'danger');
+        }
+    } catch (err) {
+        showToast('Lỗi mạng', 'danger');
+    }
+}
+
+loadDevices();
+</script>
+{% endblock %}

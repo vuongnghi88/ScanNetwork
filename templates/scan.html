@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+{% block title %}Quét mạng{% endblock %}
+{% block page_title %}<i class="bi bi-radar me-2 text-accent"></i>Quét mạng hệ thống{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+    <!-- Scan Config Panel -->
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header"><i class="bi bi-sliders"></i> Cấu hình lượt quét</div>
+            <div class="card-body">
+                <form id="scan-form">
+                    <div class="mb-3">
+                        <label class="form-label">Mục tiêu (IP / CIDR / Dải IP)</label>
+                        <input type="text" class="form-control" id="scan-target"
+                               placeholder="192.168.1.0/24" id="scan-target-input"
+                               autocomplete="off" spellcheck="false">
+                        <div class="form-text text-muted" style="font-size:.7rem">
+                            Ví dụ: 192.168.1.1 · 192.168.0.0/24 · 10.0.0.1-50
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Loại quét</label>
+                        <select class="form-select" id="scan-type">
+                            <option value="discovery">🏓 Tìm thiết bị (Discovery - nhanh)</option>
+                            <option value="ports" selected>🚪 Quét cổng & Dịch vụ</option>
+                            <option value="full">🔬 Quét chi tiết (Cổng + OS)</option>
+                            <option value="segment">🧱 Kiểm tra phân vùng (VLAN test)</option>
+                        </select>
+                    </div>
+
+                    <div id="port-options">
+                        <div class="mb-3">
+                            <label class="form-label">Custom Ports (tùy chọn)</label>
+                            <input type="text" class="form-control" id="custom-ports"
+                                   placeholder="22,80,443,8080 hoặc 1-1024" autocomplete="off">
+                        </div>
+                        <div class="mb-3">
+                            <div class="form-check form-switch mb-1">
+                                <input class="form-check-input" type="checkbox" id="opt-svc" checked>
+                                <label class="form-check-label" for="opt-svc">Phiên bản dịch vụ (-sV)</label>
+                            </div>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="opt-os">
+                                <label class="form-check-label" for="opt-os">Nhận diện HĐH (-O) <span class="badge risk-high">Admin</span></label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="segment-options" style="display:none">
+                        <div class="mb-3">
+                            <label class="form-label">Các dải mạng nội bộ cần thăm dò</label>
+                            <textarea class="form-control" id="internal-subnets" rows="3"
+                                      placeholder="10.0.0.0/24&#10;172.16.0.0/16&#10;192.168.10.0/24"
+                                      style="font-family:var(--font-mono);font-size:.8rem"></textarea>
+                            <div class="form-text" style="font-size:.7rem">Mỗi dòng 1 subnet — dải mạng nội bộ cần thăm dò</div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Tên lượt quét (tùy chọn)</label>
+                        <input type="text" class="form-control" id="scan-name" placeholder="Lab scan #1">
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary flex-grow-1" id="start-btn">
+                            <i class="bi bi-play-circle me-1"></i> Bắt đầu
+                        </button>
+                        <button type="button" class="btn btn-danger px-3" id="stop-btn" style="display:none" onclick="stopScan()">
+                            <i class="bi bi-stop-circle me-1"></i> Dừng
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Quick presets -->
+                <hr class="section-divider">
+                <div class="text-muted mb-2" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.07em">Danh sách dải mạng</div>
+                <div class="d-flex flex-wrap gap-2 mb-2" id="network-list-btns">
+                    <span class="text-muted" style="font-size:.75rem">Đang tải…</span>
+                </div>
+                <div class="text-muted mb-1 mt-2" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.07em">Cấu hình nhanh</div>
+                <div class="d-flex flex-wrap gap-2">
+                    <button type="button" class="btn btn-sm btn-primary w-100 mb-1" onclick="setPreset('monitored_list','ports')">
+                        <i class="bi bi-shield-check me-1"></i> Quét danh sách giám sát
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setPreset('127.0.0.1','discovery')">Localhost</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setPreset('192.168.1.*','discovery')">192.168.1.*</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setPreset('192.168.*.*','ports')">192.168.*.*</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setPreset('10.0.0.0/24','ports')">10.0.0.x</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scan Status + Results -->
+    <div class="col-lg-8">
+        <!-- Status box -->
+        <div class="scan-status-box mb-3" id="status-box" style="display:none">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+                <div>
+                    <div class="scan-status-label">Trạng thái</div>
+                    <div class="scan-status-value" id="status-val">—</div>
+                </div>
+                <div class="text-end">
+                    <div class="scan-status-label">Thiết bị tìm thấy</div>
+                    <div class="stat-value" id="hosts-found-val" style="font-size:1.5rem">0</div>
+                </div>
+            </div>
+            <div class="progress mb-1">
+                <div class="progress-bar progress-bar-striped progress-bar-animated"
+                     id="scan-progress" role="progressbar" style="width:0%"></div>
+            </div>
+            <div class="d-flex justify-content-between" style="font-size:.7rem;color:var(--text-dim)">
+                <span id="progress-pct">0%</span>
+                <span id="scan-target-label"></span>
+            </div>
+        </div>
+
+        <!-- Results table -->
+        <div class="card">
+            <div class="card-header d-flex align-items-center justify-content-between">
+                <span><i class="bi bi-table"></i> Kết quả</span>
+                <div class="d-flex gap-2 align-items-center">
+                    <span class="badge bg-secondary" id="result-count">0 thiết bị</span>
+                    <button class="btn btn-sm btn-outline-secondary" id="save-baseline-btn" style="display:none"
+                            onclick="saveBaseline()">
+                        <i class="bi bi-bookmark-plus me-1"></i>Lưu Baseline
+                    </button>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Thiết bị</th>
+                                <th>Địa chỉ IP</th>
+                                <th>MAC / Nhà sản xuất</th>
+                                <th>Hệ điều hành</th>
+                                <th>Cổng đang mở</th>
+                                <th>Rủi ro</th>
+                            </tr>
+                        </thead>
+                        <tbody id="results-tbody">
+                            <tr><td colspan="6" class="no-data-placeholder">
+                                <i class="bi bi-radar"></i>
+                                Hãy cấu hình mục tiêu và nhấn Bắt đầu quét
+                            </td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Previous Scans (bottom) -->
+<div class="mt-3">
+    <div class="card">
+        <div class="card-header"><i class="bi bi-clock-history"></i> Lịch sử quét</div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr><th>#</th><th>Tên</th><th>Mục tiêu</th><th>Loại quét</th><th>Trạng thái</th><th>Thời gian</th><th>Số thiết bị</th><th></th></tr>
+                    </thead>
+                    <tbody id="history-tbody">
+                        <tr><td colspan="8" class="text-center text-muted py-3">Đang tải…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/scanner.js') }}"></script>
+<script>
+document.getElementById('scan-type').addEventListener('change', function() {
+    const isSegment = this.value === 'segment';
+    document.getElementById('segment-options').style.display = isSegment ? 'block' : 'none';
+    document.getElementById('port-options').style.display   = isSegment ? 'none'  : 'block';
+});
+
+function setPreset(target, type) {
+    document.getElementById('scan-target').value = target;
+    document.getElementById('scan-type').value = type;
+}
+
+// Check URL for ?view=<scan_id>
+const urlParams = new URLSearchParams(window.location.search);
+const viewScanId = urlParams.get('view');
+if (viewScanId) {
+    loadScanResults(viewScanId);
+}
+</script>
+{% endblock %}

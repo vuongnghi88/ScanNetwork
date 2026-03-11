@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{% block title %}Dữ liệu mẫu{% endblock %}
+{% block page_title %}<i class="bi bi-clipboard-data me-2 text-accent"></i>So sánh với Dữ liệu mẫu (Baseline){% endblock %}
+
+{% block content %}
+<div class="row g-3">
+    <!-- Baselines list -->
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header"><i class="bi bi-bookmark"></i> Bản mẫu đã lưu</div>
+            <div class="card-body p-0" id="baselines-list" style="max-height:400px;overflow-y:auto">
+                <div class="text-center text-muted py-4">Đang tải…</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Compare panel -->
+    <div class="col-lg-8">
+        <div class="card mb-3">
+            <div class="card-header"><i class="bi bi-arrow-left-right"></i> So sánh Baseline vs Lượt quét</div>
+            <div class="card-body">
+                <div class="row g-2 align-items-end">
+                    <div class="col">
+                        <label class="form-label">Chọn bản mẫu (Baseline)</label>
+                        <select class="form-select" id="cmp-baseline">
+                            <option value="">Chọn bản mẫu…</option>
+                        </select>
+                    </div>
+                    <div class="col">
+                        <label class="form-label">So sánh với lượt quét</label>
+                        <select class="form-select" id="cmp-scan">
+                            <option value="">Chọn lượt quét…</option>
+                        </select>
+                    </div>
+                    <div class="col-auto">
+                        <button class="btn btn-primary" onclick="runCompare()">
+                            <i class="bi bi-play-fill me-1"></i>So sánh
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Diff results -->
+        <div id="diff-result" style="display:none">
+            <!-- Summary -->
+            <div class="row g-2 mb-3" id="diff-summary"></div>
+            <!-- Added -->
+            <div id="diff-added-section"></div>
+            <!-- Removed -->
+            <div id="diff-removed-section"></div>
+            <!-- Changed -->
+            <div id="diff-changed-section"></div>
+        </div>
+
+        <div id="diff-placeholder" class="no-data-placeholder">
+            <i class="bi bi-arrow-left-right"></i>
+            Chọn một bản mẫu và một lượt quét, sau đó nhấn So sánh để xem sự thay đổi
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let baselines = [], scans = [];
+
+function renderBaselineList() {
+    const container = document.getElementById('baselines-list');
+    if (baselines.length === 0) {
+        container.innerHTML = `<div class="text-center text-muted py-4 px-3">
+            Chưa có bản mẫu nào được lưu.<br>
+            <small>Vào trang Quét mạng, thực hiện quét và nhấn "Lưu Baseline".</small>
+        </div>`;
+        return;
+    }
+    container.innerHTML = baselines.map(b => `
+        <div class="p-3 border-bottom d-flex justify-content-between align-items-center" style="border-color:var(--border)!important">
+            <div>
+                <div class="fw-semibold" style="font-size:.85rem">${b.name}</div>
+                <div class="text-muted" style="font-size:.72rem">
+                    Scan #${b.scan_id} · ${b.target||''}<br>
+                    ${new Date(b.created_at).toLocaleString('vi-VN')}
+                </div>
+            </div>
+            <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="deleteBaseline(${b.id})">
+                <i class="bi bi-trash"></i>
+            </button>
+        </div>`).join('');
+}
+
+function populateSelects() {
+    const bSel = document.getElementById('cmp-baseline');
+    const sSel = document.getElementById('cmp-scan');
+    bSel.innerHTML = '<option value="">Chọn bản mẫu…</option>' +
+        baselines.map(b => `<option value="${b.id}">${b.name} (#${b.id})</option>`).join('');
+    sSel.innerHTML = '<option value="">Chọn lượt quét…</option>' +
+        scans.map(s => `<option value="${s.id}">${s.name||s.target} (#${s.id}) — ${s.status}</option>`).join('');
+}
+
+async function runCompare() {
+    const bId = document.getElementById('cmp-baseline').value;
+    const sId = document.getElementById('cmp-scan').value;
+    if (!bId || !sId) { showToast('Select both baseline and scan', 'warning'); return; }
+
+    const data = await fetch(`/api/baseline/compare?baseline_id=${bId}&scan_id=${sId}`)
+        .then(r=>r.json()).catch(e => ({error: String(e)}));
+    if (data.error) { showToast(data.error, 'danger'); return; }
+
+    document.getElementById('diff-placeholder').style.display = 'none';
+    document.getElementById('diff-result').style.display = 'block';
+
+    // Summary
+    document.getElementById('diff-summary').innerHTML = `
+        <div class="col-4"><div class="stat-card success">
+            <div class="stat-value">${data.summary.added}</div>
+            <div class="stat-label">Thiết bị mới</div>
+        </div></div>
+        <div class="col-4"><div class="stat-card danger">
+            <div class="stat-value">${data.summary.removed}</div>
+            <div class="stat-label">Thiết bị đã mất</div>
+        </div></div>
+        <div class="col-4"><div class="stat-card warning">
+            <div class="stat-value">${data.summary.changed}</div>
+            <div class="stat-label">Thiết bị thay đổi</div>
+        </div></div>`;
+
+    // Added
+    document.getElementById('diff-added-section').innerHTML = data.added_hosts.length ? `
+        <div class="card mb-3 diff-added">
+            <div class="card-header text-success"><i class="bi bi-plus-circle me-2"></i>Thiết bị mới (${data.added_hosts.length})</div>
+            <div class="card-body p-0">${hostTable(data.added_hosts)}</div>
+        </div>` : '';
+
+    // Removed
+    document.getElementById('diff-removed-section').innerHTML = data.removed_hosts.length ? `
+        <div class="card mb-3 diff-removed">
+            <div class="card-header text-danger"><i class="bi bi-dash-circle me-2"></i>Thiết bị đã mất (${data.removed_hosts.length})</div>
+            <div class="card-body p-0">${hostTable(data.removed_hosts)}</div>
+        </div>` : '';
+
+    // Changed
+    document.getElementById('diff-changed-section').innerHTML = data.changed_hosts.length ? `
+        <div class="card mb-3 diff-changed">
+            <div class="card-header text-warning"><i class="bi bi-pencil me-2"></i>Thiết bị thay đổi (${data.changed_hosts.length})</div>
+            <div class="card-body">
+                ${data.changed_hosts.map(c => `
+                <div class="mb-3">
+                    <div class="ip-addr">${c.ip}</div>
+                    ${c.new_ports.length ? `<div class="mt-1"><span class="text-success small me-1">+Cổng mới:</span>${c.new_ports.map(p=>`<span class="port-pill high">${p}</span>`).join('')}</div>`:'' }
+                    ${c.closed_ports.length ? `<div class="mt-1"><span class="text-danger small me-1">-Đóng cổng:</span>${c.closed_ports.map(p=>`<span class="port-pill">${p}</span>`).join('')}</div>`:'' }
+                </div>`).join('<hr style="border-color:var(--border)">')}
+            </div>
+        </div>` : '';
+}
+
+async function deleteBaseline(id) {
+    const ok = await confirmModal('Xác nhận xóa', `Bạn có chắc chắn muốn xóa bản mẫu #${id}?`);
+    if (!ok) return;
+    try {
+        const res = await fetch(`/api/baseline/${id}`, {method: 'DELETE'});
+        if (res.ok) {
+            showToast(`Đã xóa bản mẫu #${id}`, 'info');
+            loadData();
+        } else {
+            const data = await res.json().catch(() => ({}));
+            showToast(data.error || 'Lỗi khi xóa bản mẫu', 'danger');
+        }
+    } catch (err) {
+        showToast('Lỗi mạng khi xóa', 'danger');
+    }
+}
+
+function hostTable(hosts) {
+    return `<table class="table table-hover mb-0">
+        <thead><tr><th>IP</th><th>NSX</th><th>Loại</th><th>Cổng</th></tr></thead>
+        <tbody>${hosts.map(h=>`<tr>
+            <td class="ip-addr">${h.ip}</td>
+            <td style="font-size:.8rem">${h.vendor||'—'}</td>
+            <td style="font-size:.8rem">${h.device_type||'—'}</td>
+            <td>${(h.ports||[]).map(p=>`<span class="port-pill">${p.port}</span>`).join('')}</td>
+        </tr>`).join('')}</tbody>
+    </table>`;
+}
+
+async function loadData() {
+    [baselines, scans] = await Promise.all([
+        fetch('/api/baselines').then(r=>r.json()).catch(()=>[]),
+        fetch('/api/scans').then(r=>r.json()).catch(()=>[]),
+    ]);
+    renderBaselineList();
+    populateSelects();
+}
+
+loadData();
+</script>
+{% endblock %}

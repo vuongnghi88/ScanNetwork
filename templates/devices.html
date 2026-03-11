@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}Thiết bị{% endblock %}
+{% block page_title %}<i class="bi bi-hdd-network me-2 text-accent"></i>Danh mục thiết bị{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="d-flex gap-2 flex-wrap" id="filter-btns">
+        <button class="btn btn-sm btn-primary active" onclick="filterDevices(this,'all')">Tất cả</button>
+        <button class="btn btn-sm btn-outline-secondary" onclick="filterDevices(this,'IP Camera')">📷 Camera</button>
+        <button class="btn btn-sm btn-outline-secondary" onclick="filterDevices(this,'Network Device')">🔌 Thiết bị mạng</button>
+        <button class="btn btn-sm btn-outline-secondary" onclick="filterDevices(this,'Windows PC')">💻 Windows</button>
+        <button class="btn btn-sm btn-outline-secondary" onclick="filterDevices(this,'Linux Server')">🖥️ Linux</button>
+        <button class="btn btn-sm btn-outline-secondary" onclick="filterDevices(this,'Unknown Device')">❓ Chưa rõ</button>
+    </div>
+    <div>
+        <input type="text" class="form-control form-control-sm" id="search-input"
+               placeholder="Tìm theo IP, MAC, nhà sản xuất…" style="width:220px">
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between">
+        <span><i class="bi bi-list-ul"></i> Danh sách thiết bị đã phát hiện</span>
+        <span class="badge bg-secondary" id="device-total">Đang tải…</span>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Loại thiết bị</th>
+                        <th>Địa chỉ IP</th>
+                        <th>Tên máy (Hostname)</th>
+                        <th>Địa chỉ MAC</th>
+                        <th>Nhà sản xuất</th>
+                        <th>OS (HĐH)</th>
+                        <th>Cổng đang mở</th>
+                        <th>Rủi ro</th>
+                        <th>Lần cuối thấy</th>
+                    </tr>
+                </thead>
+                <tbody id="devices-tbody">
+                    <tr><td colspan="9" class="text-center text-muted py-4">Đang tải…</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let allDevices = [];
+let currentFilter = 'all';
+
+const CRITICAL_PORTS = new Set([23,21,3389,5900,3306,5432,1433,27017,6379,9200]);
+const HIGH_PORTS = new Set([22,554,445,135,8000,37777]);
+
+function portPill(p) {
+    let cls = '';
+    if (CRITICAL_PORTS.has(p.port)) cls = 'critical';
+    else if (HIGH_PORTS.has(p.port)) cls = 'high';
+    const tip = p.service ? `title="${p.service} ${p.version||''}"` : '';
+    return `<span class="port-pill ${cls}" ${tip}>${p.port}/${p.protocol}</span>`;
+}
+
+function riskBadge(risk) {
+    const map = {critical:'Nghiêm trọng',high:'Cao',medium:'Trung bình',low:'Thấp',unknown:'Chưa rõ'};
+    return `<span class="badge risk-${risk}">${map[risk]||risk}</span>`;
+}
+
+function renderDevices(devices) {
+    const tbody = document.getElementById('devices-tbody');
+    if (devices.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="9" class="no-data-placeholder"><i class="bi bi-inbox"></i>Không tìm thấy thiết bị nào. Hãy thực hiện quét trước.</td></tr>`;
+        return;
+    }
+    tbody.innerHTML = devices.map(d => `
+        <tr>
+            <td><span style="font-size:1.1rem">${d.icon||'❓'}</span> <span style="font-size:.8rem">${d.device_type||'Unknown'}</span></td>
+            <td class="ip-addr">${d.ip}</td>
+            <td class="text-muted" style="font-size:.8rem">${d.hostname||'—'}</td>
+            <td class="mac-addr">${d.mac||'—'}</td>
+            <td style="font-size:.8rem">${d.vendor||'—'}</td>
+            <td style="font-size:.75rem;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${d.os_info||''}">${d.os_info||'—'}</td>
+            <td style="min-width:200px">${(d.ports||[]).map(portPill).join('')}</td>
+            <td>${riskBadge(d.risk||'unknown')}</td>
+            <td class="text-muted" style="font-size:.75rem">${d.scan_time ? new Date(d.scan_time).toLocaleString('vi-VN',{dateStyle:'short',timeStyle:'short'}) : '—'}</td>
+        </tr>`).join('');
+}
+
+function filterDevices(btn, type) {
+    document.querySelectorAll('#filter-btns .btn').forEach(b => {
+        b.classList.remove('active','btn-primary');
+        b.classList.add('btn-outline-secondary');
+    });
+    btn.classList.add('active','btn-primary');
+    btn.classList.remove('btn-outline-secondary');
+    currentFilter = type;
+    applyFilters();
+}
+
+function applyFilters() {
+    const q = document.getElementById('search-input').value.toLowerCase();
+    let filtered = allDevices;
+    if (currentFilter !== 'all') {
+        filtered = filtered.filter(d => (d.device_type||'').includes(currentFilter));
+    }
+    if (q) {
+        filtered = filtered.filter(d =>
+            d.ip.includes(q) ||
+            (d.mac||'').toLowerCase().includes(q) ||
+            (d.vendor||'').toLowerCase().includes(q) ||
+            (d.hostname||'').toLowerCase().includes(q)
+        );
+    }
+    renderDevices(filtered);
+}
+
+document.getElementById('search-input').addEventListener('input', applyFilters);
+
+async function loadDevices() {
+    const data = await fetch('/api/devices').then(r=>r.json()).catch(()=>[]);
+    allDevices = data;
+    document.getElementById('device-total').textContent = `${data.length} thiết bị`;
+    applyFilters();
+}
+
+loadDevices();
+setInterval(loadDevices, 30000);
+</script>
+{% endblock %}

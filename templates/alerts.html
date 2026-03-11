@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block title %}Cảnh báo{% endblock %}
+{% block page_title %}<i class="bi bi-exclamation-triangle me-2 text-accent"></i>Cảnh báo & Giám sát{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <div class="d-flex gap-2 flex-wrap">
+        <button class="btn btn-sm btn-primary active btn-filter-severity" onclick="filterBySeverity(this,'all')">Tất cả mức độ</button>
+        <button class="btn btn-sm btn-outline-secondary btn-filter-severity" onclick="filterBySeverity(this,'critical')">🚨 Nghiêm trọng</button>
+        <button class="btn btn-sm btn-outline-secondary btn-filter-severity" onclick="filterBySeverity(this,'high')">⚠️ Cao</button>
+        <button class="btn btn-sm btn-outline-secondary btn-filter-severity" onclick="filterBySeverity(this,'unread')">🔵 Chưa đọc</button>
+    </div>
+    <button class="btn btn-sm btn-outline-secondary" onclick="markAllRead()">
+        <i class="bi bi-check2-all me-1"></i>Đánh dấu đã đọc hết
+    </button>
+</div>
+
+<!-- Phân loại Tags -->
+<div class="d-flex gap-2 flex-wrap mb-3" id="tag-filters">
+    <span class="text-muted me-2 d-flex align-items-center" style="font-size: 0.85rem;">Phân loại theo Tag:</span>
+    <button class="btn btn-xs btn-outline-info active tag-btn" onclick="filterByTag(this, 'all')">Tất cả</button>
+    <button class="btn btn-xs btn-outline-info tag-btn" onclick="filterByTag(this, 'port')">#Port</button>
+    <button class="btn btn-xs btn-outline-info tag-btn" onclick="filterByTag(this, 'service')">#Service</button>
+    <button class="btn btn-xs btn-outline-info tag-btn" onclick="filterByTag(this, 'vlan')">#VLAN</button>
+    <button class="btn btn-xs btn-outline-info tag-btn" onclick="filterByTag(this, 'new_device')">#NewDevice</button>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-4">
+        <div class="stat-card danger">
+            <span class="stat-icon">🚨</span>
+            <div class="stat-value" id="cnt-critical">0</div>
+            <div class="stat-label">Nghiêm trọng</div>
+        </div>
+    </div>
+    <div class="col-4">
+        <div class="stat-card warning">
+            <span class="stat-icon">⚠️</span>
+            <div class="stat-value" id="cnt-high">0</div>
+            <div class="stat-label">Cao</div>
+        </div>
+    </div>
+    <div class="col-4">
+        <div class="stat-card">
+            <span class="stat-icon">ℹ️</span>
+            <div class="stat-value" id="cnt-medium">0</div>
+            <div class="stat-label">Trung bình / Thông tin</div>
+        </div>
+    </div>
+</div>
+
+<div id="alerts-list">
+    <div class="text-center text-muted py-5">Đang tải…</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let allAlerts = [];
+let currentFilter = 'all';
+
+const SEVERITY_ICON = { critical:'🚨', high:'⚠️', medium:'ℹ️', low:'✅', info:'ℹ️' };
+const SEVERITY_LABEL = { critical:'Nghiêm trọng', high:'Cao', medium:'Trung bình', low:'Thấp', info:'Thông tin' };
+
+function renderAlerts(alerts) {
+    const container = document.getElementById('alerts-list');
+    if (alerts.length === 0) {
+        container.innerHTML = `<div class="no-data-placeholder"><i class="bi bi-check-circle"></i>Không có cảnh báo nào trong bộ lọc này.</div>`;
+        return;
+    }
+    container.innerHTML = alerts.map(a => {
+        const tagsHtml = a.tags ? a.tags.split(',').map(t => `<span class="badge rounded-pill bg-info text-dark opacity-75 ms-1" style="font-size:0.65rem">#${t.trim()}</span>`).join('') : '';
+        return `
+        <div class="alert-item ${a.is_read ? '' : 'unread'} severity-${a.severity}" id="alert-${a.id}">
+            <span class="alert-item-icon">${SEVERITY_ICON[a.severity]||'❓'}</span>
+            <div class="alert-item-body">
+                <div class="d-flex align-items-start justify-content-between">
+                    <div class="alert-item-title">${a.title} ${tagsHtml}</div>
+                    <span class="badge risk-${a.severity} ms-2">${SEVERITY_LABEL[a.severity]||a.severity}</span>
+                </div>
+                ${a.message ? `<div class="alert-item-msg">${a.message}</div>` : ''}
+                ${a.ip ? `<div class="mt-1"><span class="badge bg-dark text-mono">IP: ${a.ip}</span>${a.port ? `<span class="badge bg-dark text-mono ms-1">Cổng: ${a.port}</span>` : ''}</div>` : ''}
+                <div class="d-flex align-items-center gap-3 mt-1">
+                    <span class="alert-item-time">${new Date(a.created_at).toLocaleString('vi-VN')}</span>
+                    ${!a.is_read ? `<button class="btn btn-sm py-0 px-2 btn-outline-secondary" onclick="markRead(${a.id})">Đánh dấu đã đọc</button>` : ''}
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+let currentTag = 'all';
+
+function filterBySeverity(btn, type) {
+    document.querySelectorAll('.btn-filter-severity').forEach(b => {
+        b.classList.remove('active','btn-primary');
+        b.classList.add('btn-outline-secondary');
+    });
+    btn.classList.add('active','btn-primary');
+    btn.classList.remove('btn-outline-secondary');
+    currentFilter = type;
+    applyFilter();
+}
+
+function filterByTag(btn, tag) {
+    document.querySelectorAll('.tag-btn').forEach(b => {
+        b.classList.remove('active');
+    });
+    btn.classList.add('active');
+    currentTag = tag;
+    applyFilter();
+}
+
+function applyFilter() {
+    let filtered = allAlerts;
+    
+    // Filter by severity
+    if (currentFilter === 'unread') {
+        filtered = filtered.filter(a => !a.is_read);
+    } else if (currentFilter !== 'all') {
+        filtered = filtered.filter(a => a.severity === currentFilter);
+    }
+    
+    // Filter by tag
+    if (currentTag !== 'all') {
+        filtered = filtered.filter(a => a.tags && a.tags.includes(currentTag));
+    }
+    
+    renderAlerts(filtered);
+}
+
+async function markRead(id) {
+    await fetch(`/api/alerts/${id}/read`, {method:'POST'});
+    const a = allAlerts.find(x => x.id === id);
+    if (a) a.is_read = 1;
+    applyFilter();
+}
+
+async function markAllRead() {
+    await fetch('/api/alerts/read-all', {method:'POST'});
+    allAlerts.forEach(a => a.is_read = 1);
+    applyFilter();
+    showToast('Tất cả cảnh báo đã được đánh dấu đã đọc', 'success');
+}
+
+async function loadAlerts() {
+    allAlerts = await fetch('/api/alerts').then(r=>r.json()).catch(()=>[]);
+    document.getElementById('cnt-critical').textContent = allAlerts.filter(a => a.severity==='critical').length;
+    document.getElementById('cnt-high').textContent = allAlerts.filter(a => a.severity==='high').length;
+    document.getElementById('cnt-medium').textContent = allAlerts.filter(a => ['medium','info','low'].includes(a.severity)).length;
+    applyFilter();
+}
+
+loadAlerts();
+setInterval(loadAlerts, 20000);
+</script>
+{% endblock %}
