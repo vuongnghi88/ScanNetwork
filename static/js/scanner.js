@@ -55,6 +55,8 @@ document.getElementById('scan-form')?.addEventListener('submit', async function(
         timing:          document.getElementById('opt-timing')?.value || '-T3',
         stealth_mode:    document.getElementById('opt-stealth')?.checked || false,
         vuln_check:      document.getElementById('opt-vuln')?.checked || false,
+        web_audit:       document.getElementById('opt-web')?.checked || false,
+        camera_check:    document.getElementById('opt-camera')?.checked || false,
     };
 
     if (scanType === 'segment') {
@@ -398,6 +400,21 @@ async function checkActiveTask() {
         }
     }
 }
+
+// ── Results Filtering ─────────────────────────────────────────────────────
+document.getElementById('results-filter')?.addEventListener('input', function(e) {
+    const query = e.target.value.toLowerCase().trim();
+    const rows = document.querySelectorAll('#results-tbody tr.scan-result-row');
+    
+    rows.forEach(row => {
+        const text = row.innerText.toLowerCase();
+        if (text.includes(query)) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+});
 
 // ── Init ──────────────────────────────────────────────────────────────────
 loadNetworkLists();

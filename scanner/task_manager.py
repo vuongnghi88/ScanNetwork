@@ -201,6 +201,20 @@ def _execute_scan(payload: dict):
         if payload.get("vuln_check"):
             # Use NSE vuln scripts
             args += " --script vuln"
+
+        if payload.get("web_audit"):
+            # Detailed web service auditing
+            args += " --script http-enum,http-title,http-methods"
+
+        if payload.get("camera_check"):
+            # Common camera/iot ports and RTSP discovery
+            camera_ports = "554,8000,8080,81,80,37777"
+            if "-p " in args:
+                # Append to existing ports if not discovery
+                args = args.replace("-p ", f"-p {camera_ports},")
+            else:
+                args += f" -p {camera_ports}"
+            args += " --script rtsp-methods,rtsp-url-enumeration"
         
         print(f"DEBUG: Starting Nmap scan for {target} with args: {args}")
 

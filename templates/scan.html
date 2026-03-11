@@ -75,28 +75,46 @@
                                     <div class="mb-3">
                                         <label class="form-label small fw-bold text-muted">Tốc độ quét (Timing)</label>
                                         <select class="form-select form-select-sm bg-dark text-light border-secondary" id="opt-timing">
-                                            <option value="-T0">T0: Rất chậm (Paranoid)</option>
-                                            <option value="-T1">T1: Chậm (Sneaky)</option>
-                                            <option value="-T2">T2: Vừa phải (Polite)</option>
+                                            <option value="-T0">T0: Rất chậm (Paranoid) - Tàng hình cực cao</option>
+                                            <option value="-T1">T1: Chậm (Sneaky) - Tránh IPS/IDS</option>
+                                            <option value="-T2">T2: Vừa phải (Polite) - Tiết kiệm băng thông</option>
                                             <option value="-T3" selected>T3: Bình thường (Normal)</option>
-                                            <option value="-T4">T4: Nhanh (Aggressive)</option>
-                                            <option value="-T5">T5: Cực nhanh (Insane)</option>
+                                            <option value="-T4">T4: Nhanh (Aggressive) - Cho mạng ổn định</option>
+                                            <option value="-T5">T5: Cực nhanh (Insane) - Quét tốc độ cao</option>
                                         </select>
-                                        <div class="text-muted mt-1" style="font-size:.65rem">Dùng T1-T2 để tránh bị Firewall chặn.</div>
+                                        <div class="text-muted mt-1" style="font-size:.65rem">Dùng T1-T2 nếu bạn thường xuyên bị Firewall chặn hoặc cảnh báo tấn công.</div>
                                     </div>
+
                                     <div class="form-check form-switch mb-2">
                                         <input class="form-check-input" type="checkbox" id="opt-stealth">
                                         <label class="form-check-label small text-light" for="opt-stealth">
                                             <i class="bi bi-incognito me-1 text-info"></i> Chế độ Ẩn mình (Stealth)
                                         </label>
-                                        <div class="text-muted mt-0" style="font-size:.65rem">Phân mảnh gói tin & Xáo trộn máy đích (-f -Pn).</div>
+                                        <div class="text-muted mt-0" style="font-size:.65rem">Phân mảnh gói tin (-f) & Xáo trộn máy đích để vượt qua các hệ thống giám sát.</div>
                                     </div>
-                                    <div class="form-check form-switch">
+
+                                    <div class="form-check form-switch mb-2">
                                         <input class="form-check-input" type="checkbox" id="opt-vuln">
                                         <label class="form-check-label small text-light" for="opt-vuln">
                                             <i class="bi bi-shield-exclamation me-1 text-warning"></i> Quét lỗ hổng (NSE Vuln)
                                         </label>
-                                        <div class="text-muted mt-0" style="font-size:.65rem">Phát hiện lỗi bảo mật đã biết (--script vuln).</div>
+                                        <div class="text-muted mt-0" style="font-size:.65rem">Kiểm tra các lỗi bảo mật (CVE) đã biết trên các dịch vụ đang chạy.</div>
+                                    </div>
+
+                                    <div class="form-check form-switch mb-2">
+                                        <input class="form-check-input" type="checkbox" id="opt-web">
+                                        <label class="form-check-label small text-light" for="opt-web">
+                                            <i class="bi bi-browser-chrome me-1 text-primary"></i> Kiểm tra Web (HTTP Audit)
+                                        </label>
+                                        <div class="text-muted mt-0" style="font-size:.65rem">Dò tìm thư mục ẩn, file nhạy cảm (.git, .env) và phương thức HTTP nguy hiểm.</div>
+                                    </div>
+
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="opt-camera">
+                                        <label class="form-check-label small text-light" for="opt-camera">
+                                            <i class="bi bi-camera-video me-1 text-danger"></i> Dò tìm Camera / IoT
+                                        </label>
+                                        <div class="text-muted mt-0" style="font-size:.65rem">Quét các cổng Camera (RTSP, 8000...) và kiểm tra tính bảo mật cơ bản.</div>
                                     </div>
                                 </div>
                             </div>
@@ -160,7 +178,13 @@
         <!-- Results table -->
         <div class="card">
             <div class="card-header d-flex align-items-center justify-content-between">
-                <span><i class="bi bi-table"></i> Kết quả</span>
+                <div class="d-flex align-items-center gap-3">
+                    <span><i class="bi bi-table"></i> Kết quả</span>
+                    <div class="input-group input-group-sm" style="width: 200px;">
+                        <span class="input-group-text bg-dark border-secondary text-muted"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-control bg-dark text-light border-secondary" id="results-filter" placeholder="Lọc nội dung...">
+                    </div>
+                </div>
                 <div class="d-flex gap-2 align-items-center">
                     <span class="badge bg-secondary" id="result-count">0 thiết bị</span>
                     <button class="btn btn-sm btn-outline-secondary" id="save-baseline-btn" style="display:none"
