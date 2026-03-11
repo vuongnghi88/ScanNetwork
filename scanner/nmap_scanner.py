@@ -45,7 +45,7 @@ def expand_wildcard(target: str) -> str:
 
 
 _VALID_TARGET_RE = re.compile(
-    r'^[\d./,\s\-a-zA-Z:*]+$'  # allow IP, CIDR, ranges, hostnames, wildcard *
+    r'^[\d./,\s\-a-zA-Z:*_]+$'  # allow IP, CIDR, ranges, hostnames, wildcard *, and underscore
 )
 _DANGEROUS_RE = re.compile(r'[;&|$<>!`\'\"\\]')
 
