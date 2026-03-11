@@ -52,6 +52,9 @@ document.getElementById('scan-form')?.addEventListener('submit', async function(
         ports:    document.getElementById('custom-ports')?.value.trim() || '',
         service_version: document.getElementById('opt-svc')?.checked ?? true,
         os_detect:       document.getElementById('opt-os')?.checked  ?? false,
+        timing:          document.getElementById('opt-timing')?.value || '-T3',
+        stealth_mode:    document.getElementById('opt-stealth')?.checked || false,
+        vuln_check:      document.getElementById('opt-vuln')?.checked || false,
     };
 
     if (scanType === 'segment') {

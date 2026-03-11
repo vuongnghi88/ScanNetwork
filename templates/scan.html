@@ -62,6 +62,47 @@
                         <input type="text" class="form-control" id="scan-name" placeholder="Lab scan #1">
                     </div>
 
+                    <!-- Advanced Options accordion -->
+                    <div class="accordion accordion-flush mb-3 rounded border" id="advanced-config">
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed py-2 px-3 fw-bold small text-muted" type="button" data-bs-toggle="collapse" data-bs-target="#advanced-body">
+                                    <i class="bi bi-gear-fill me-2"></i> Cấu hình Nâng cao (Tùy chọn)
+                                </button>
+                            </h2>
+                            <div id="advanced-body" class="accordion-collapse collapse" data-bs-parent="#advanced-config">
+                                <div class="accordion-body p-3 bg-light">
+                                    <div class="mb-2">
+                                        <label class="form-label small fw-bold">Tốc độ quét (Timing)</label>
+                                        <select class="form-select form-select-sm" id="opt-timing">
+                                            <option value="-T0">T0: Rất chậm (Paranoid)</option>
+                                            <option value="-T1">T1: Chậm (Sneaky)</option>
+                                            <option value="-T2">T2: Vừa phải (Polite)</option>
+                                            <option value="-T3" selected>T3: Bình thường (Normal)</option>
+                                            <option value="-T4">T4: Nhanh (Aggressive)</option>
+                                            <option value="-T5">T5: Cực nhanh (Insane)</option>
+                                        </select>
+                                        <div class="form-text mt-0" style="font-size:.65rem">Dùng T1-T2 để tránh bị Firewall chặn.</div>
+                                    </div>
+                                    <div class="form-check form-switch mb-2">
+                                        <input class="form-check-input" type="checkbox" id="opt-stealth">
+                                        <label class="form-check-label small" for="opt-stealth">
+                                            <i class="bi bi-incognito me-1"></i> Chế độ Ẩn mình (Stealth)
+                                        </label>
+                                        <div class="form-text mt-0" style="font-size:.65rem">Phân mảnh gói tin & Xáo trộn máy đích (-f -Pn).</div>
+                                    </div>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="opt-vuln">
+                                        <label class="form-check-label small" for="opt-vuln">
+                                            <i class="bi bi-shield-exclamation me-1"></i> Quét lỗ hổng (NSE Vuln)
+                                        </label>
+                                        <div class="form-text mt-0" style="font-size:.65rem">Phát hiện lỗi bảo mật đã biết (--script vuln).</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="d-flex gap-2">
                         <button type="submit" class="btn btn-primary flex-grow-1" id="start-btn">
                             <i class="bi bi-play-circle me-1"></i> Bắt đầu

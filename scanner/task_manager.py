@@ -201,6 +201,8 @@ def _execute_scan(payload: dict):
         if payload.get("vuln_check"):
             # Use NSE vuln scripts
             args += " --script vuln"
+        
+        print(f"DEBUG: Starting Nmap scan for {target} with args: {args}")
 
         # Run streaming scan
         for host_data in scanner.live_scan(target, args, set_process_cb=set_proc):
