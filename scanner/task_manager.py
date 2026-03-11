@@ -164,11 +164,13 @@ def _execute_scan(payload: dict):
                 _active_processes[task_id] = proc
 
         # Determine nmap arguments based on scan_type
+        timing = payload.get("timing") or Config.SCAN_TIMING
+        args = f"{timing}"
+
         if scan_type == "discovery":
-            args = f"-sn {Config.SCAN_TIMING}"
+            args += " -sn"
         elif scan_type == "segment":
-            # Segment probe still uses blocking scan for simplicity as it's quick
-            # or we could refactor it too, but let's stick to core scans first.
+            # Segment probe still uses blocking scan for simplicity
             internal = payload.get("internal_subnets", [])
             result = scanner.segment_probe([target], internal)
             for item in result["reachable"]:
@@ -185,11 +187,20 @@ def _execute_scan(payload: dict):
             return
         else:
             ports_arg = payload.get("ports") or Config.COMMON_PORTS
-            args = f"{Config.SCAN_TIMING} -p {ports_arg}"
+            args += f" -p {ports_arg}"
             if payload.get("service_version", True):
                 args += " -sV"
             if payload.get("os_detect", False):
                 args += " -O"
+            
+        # Advanced options
+        if payload.get("stealth_mode"):
+            # -f: fragment packets, -Pn: skip ping, --randomize-hosts: avoid sequential patterns
+            args += " -f -Pn --randomize-hosts"
+        
+        if payload.get("vuln_check"):
+            # Use NSE vuln scripts
+            args += " --script vuln"
 
         # Run streaming scan
         for host_data in scanner.live_scan(target, args, set_process_cb=set_proc):
