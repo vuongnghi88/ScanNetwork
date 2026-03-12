@@ -1,8 +1,28 @@
 @echo off
+setlocal enabledelayedexpansion
+:: Chuyen vao thu muc chua file bat de tranh loi System32 khi chay Admin
+cd /d "%~dp0"
 title ScanNetwork - Backend Server
 echo ==========================================
 echo    SCAN NETWORK PROJECT - RUNNER
 echo ==========================================
+
+:: ── Check for Admin ──────────────────────────────────────────────────────────
+net session >nul 2>&1
+if !errorLevel! == 0 (
+    echo [v] Dang chay voi quyen Administrator.
+) else (
+    echo [!] Ban dang chay voi quyen User thuong.
+    echo [?] Co muon chay lai voi quyen Administrator khong? ^(Y/N^)
+    set /p choice="Lua chon: "
+    if /i "!choice!"=="Y" (
+        echo [+] Dang yeu cau quyen Admin...
+        powershell -Command "Start-Process '%~f0' -Verb RunAs"
+        exit /b
+    ) else (
+        echo [!] Tiep tuc voi quyen User ^(Mot so tinh nang quet se bi han che^).
+    )
+)
 
 :: Kiem tra Python
 python --version >nul 2>&1
@@ -11,7 +31,9 @@ if %errorlevel% neq 0 (
     pause
     exit /b
 )
+
 :: Kiem tra neu dang chay thi restart
+echo.
 echo [0/2] Kiem tra trang thai dich vu...
 netstat -ano | findstr :5000 >nul 2>&1
 if %errorlevel% equ 0 (
@@ -27,9 +49,8 @@ if %errorlevel% equ 0 (
 )
 
 echo.
-
 echo [1/2] Dang kiem tra thu vien...
-set LIBRARIES=flask flask-cors python-nmap requests
+set LIBRARIES=flask flask-cors python-nmap requests pytz
 
 for %%i in (%LIBRARIES%) do (
     pip show %%i >nul 2>&1
