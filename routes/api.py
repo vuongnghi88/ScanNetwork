@@ -2,8 +2,11 @@
 REST API Routes for Network Scanner
 All endpoints return JSON.
 """
-import json
+import os
+import platform
+import ctypes
 from flask import Blueprint, request, jsonify
+from config import Config
 from database import get_db, row_to_dict, rows_to_list
 from scanner import task_manager
 from scanner.nmap_scanner import validate_target
@@ -448,4 +451,24 @@ def dashboard_stats():
         "unread_alerts": unread_alerts,
         "last_scan": last_scan,
         "device_distribution": device_dist,
+    })
+# ── System Info ───────────────────────────────────────────────────────────────
+
+@api.route("/system/status", methods=["GET"])
+def system_status():
+    """Return application system status like admin privileges."""
+    is_admin = False
+    if platform.system() == "Windows":
+        try:
+            is_admin = ctypes.windll.shell32.IsUserAnAdmin() != 0
+        except:
+            is_admin = False
+    else:
+        # Check for root on Linux/macOS
+        is_admin = os.getuid() == 0
+
+    return jsonify({
+        "is_admin": is_admin,
+        "platform": platform.system(),
+        "nmap_path": Config.NMAP_PATH if 'Config' in globals() else "nmap"
     })

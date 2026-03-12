@@ -416,7 +416,27 @@ document.getElementById('results-filter')?.addEventListener('input', function(e)
     });
 });
 
+// ── Admin & Info Helpers ──────────────────────────────────────────────────
+async function checkAdminStatus() {
+    try {
+        const data = await fetch('/api/system/status').then(r => r.json());
+        const warning = document.getElementById('admin-warning');
+        if (warning) {
+            warning.style.display = data.is_admin ? 'none' : 'block';
+        }
+    } catch (_) {}
+}
+
+function initPopovers() {
+    const popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'));
+    popoverTriggerList.map(function (popoverTriggerEl) {
+        return new bootstrap.Popover(popoverTriggerEl);
+    });
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────
 loadNetworkLists();
 refreshHistory();
 checkActiveTask();
+checkAdminStatus();
+initPopovers();

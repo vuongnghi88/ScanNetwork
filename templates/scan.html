@@ -8,7 +8,16 @@
     <div class="col-lg-4">
         <div class="card">
             <div class="card-header"><i class="bi bi-sliders"></i> Cấu hình lượt quét</div>
-            <div class="card-body">
+                <div id="admin-warning" class="alert alert-warning py-2 px-3 mb-3 small" style="display:none; border-left: 4px solid var(--bs-warning);">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+                        <div>
+                            <strong>Thiếu quyền Quản trị (Admin)</strong><br>
+                            Một số tính năng như nhận diện HĐH sẽ không hoạt động chính xác.
+                            <a href="#" class="text-decoration-underline ms-1" data-bs-toggle="modal" data-bs-target="#adminHelpModal">Cách xử lý?</a>
+                        </div>
+                    </div>
+                </div>
                 <form id="scan-form">
                     <div class="mb-3">
                         <label class="form-label">Mục tiêu (IP / CIDR / Dải IP)</label>
@@ -42,7 +51,13 @@
                             </div>
                             <div class="form-check form-switch">
                                 <input class="form-check-input" type="checkbox" id="opt-os">
-                                <label class="form-check-label" for="opt-os">Nhận diện HĐH (-O) <span class="badge risk-high">Admin</span></label>
+                                <label class="form-check-label" for="opt-os">
+                                    Nhận diện HĐH (-O) 
+                                    <span class="badge risk-high" style="cursor:help" 
+                                          data-bs-toggle="popover" data-bs-trigger="hover focus" 
+                                          title="Yêu cầu Admin" 
+                                          data-bs-content="Nmap cần quyền Administrator để tạo gói tin TCP/IP thô nhằm phân tích đặc điểm hệ điều hành.">Admin</span>
+                                </label>
                             </div>
                         </div>
                     </div>
@@ -233,6 +248,33 @@
                         <tr><td colspan="8" class="text-center text-muted py-3">Đang tải…</td></tr>
                     </tbody>
                 </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Admin Help Modal -->
+<div class="modal fade" id="adminHelpModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark text-light border-secondary">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title"><i class="bi bi-shield-lock me-2"></i>Hướng dẫn Kích hoạt quyền Admin</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Để sử dụng đầy đủ các tính năng của ScanNetwork (nhận diện HĐH, Stealth Scan...), bạn cần chạy ứng dụng với quyền cao nhất:</p>
+                <ol class="small">
+                    <li class="mb-2">Tắt ứng dụng hiện tại (Ctrl+C).</li>
+                    <li class="mb-2">Tìm file <code>run_project.bat</code> trong thư mục dự án.</li>
+                    <li class="mb-2">Chuột phải vào file và chọn <strong>"Run as Administrator"</strong> (Chạy với quyền quản trị).</li>
+                    <li>Truy cập lại địa chỉ <code>http://127.0.0.1:5000</code>.</li>
+                </ol>
+                <div class="alert alert-info py-2 small mt-3">
+                    <i class="bi bi-info-circle me-1"></i> <strong>Lưu ý:</strong> "Unknown Device" thường xuất hiện khi Nmap không đủ quyền để quét sâu hoặc thiết bị đó đang ẩn các cổng dịch vụ cơ bản.
+                </div>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đã hiểu</button>
             </div>
         </div>
     </div>
